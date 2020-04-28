@@ -1,25 +1,21 @@
 package pan.lib.butterknifelite;
 
 import android.os.Bundle;
-import android.widget.ImageView;
-import android.widget.TextView;
+import android.widget.Button;
 
-import androidx.appcompat.app.AppCompatActivity;
+import androidx.annotation.Nullable;
 
-import pan.lib.butterknife.ButterKnife;
 import pan.lib.butterknife_annotation.BindView;
 
-public class SecondActivity extends AppCompatActivity {
+public class SecondActivity extends MainActivity {
 
-    @BindView(R.id.tv_second)
-    TextView tvSecond;
-    @BindView(R.id.iv_second)
-    ImageView ivSecond;
+    @BindView(R.id.button)
+    Button button;
+
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_second);
-        ButterKnife.bind(this);
+        button.setText("success");
     }
 }
