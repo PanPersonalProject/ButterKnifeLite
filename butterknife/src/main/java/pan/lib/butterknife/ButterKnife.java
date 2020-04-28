@@ -4,7 +4,7 @@ import android.app.Activity;
 
 
 /**
- * Author:         panqi
+ * Author:         pan qi
  * CreateDate:     2020/4/23 18:00
  */
 public class ButterKnife {
