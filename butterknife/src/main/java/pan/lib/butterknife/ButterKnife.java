@@ -1,13 +1,6 @@
 package pan.lib.butterknife;
 
 import android.app.Activity;
-import android.view.View;
-
-import java.lang.reflect.Field;
-import java.util.ArrayList;
-import java.util.Arrays;
-
-import pan.lib.butterknife_annotation.BindView;
 
 
 /**
@@ -15,12 +8,16 @@ import pan.lib.butterknife_annotation.BindView;
  * CreateDate:     2020/4/23 18:00
  */
 public class ButterKnife {
-
+    private static final String ACTIVITY_VIEW_BINDING_SUFFIX = "$ViewBinding";
 
     public static void bind(Activity activity) {
-
+        String companyClassName = activity.getClass().getName() + ACTIVITY_VIEW_BINDING_SUFFIX;
+        try {
+            Class<?> companyClass = Class.forName(companyClassName);
+            companyClass.getDeclaredConstructor(activity.getClass()).newInstance(activity);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
-
-
 
 }

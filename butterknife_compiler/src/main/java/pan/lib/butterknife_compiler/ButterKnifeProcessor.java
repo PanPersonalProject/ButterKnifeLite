@@ -2,14 +2,16 @@ package pan.lib.butterknife_compiler;
 
 
 import com.google.auto.service.AutoService;
+import com.squareup.javapoet.ClassName;
 import com.squareup.javapoet.JavaFile;
 import com.squareup.javapoet.MethodSpec;
 import com.squareup.javapoet.TypeSpec;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.Set;
-import java.util.logging.Logger;
 
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Messager;
@@ -39,50 +41,92 @@ import pan.lib.butterknife_annotation.BindView;
 public class ButterKnifeProcessor extends AbstractProcessor {
     private Messager messager;
     private ProcessingEnvironment environment;
+    private Map<String, BindViewModel> map = new HashMap<>();  //注解分类 一个class对应多个注解
 
     @Override
     public synchronized void init(ProcessingEnvironment processingEnv) {
         super.init(processingEnv);
         environment = processingEnv;
         messager = processingEnv.getMessager();
-        messager.printMessage(Diagnostic.Kind.NOTE, "初始化");
-
     }
 
     @Override
     public boolean process(Set<? extends TypeElement> set, RoundEnvironment roundEnvironment) {
-        Set<? extends Element> elementsSet = roundEnvironment.getElementsAnnotatedWith(BindView.class);
-        if (elementsSet == null) return true;
-        for (Element element : elementsSet) {
-            messager.printMessage(Diagnostic.Kind.NOTE, element.toString());
-        }
+        Set<? extends Element> elementsSet = roundEnvironment.getElementsAnnotatedWith(BindView.class);  //返回所有被注解了@BindView的元素的列表
+        if (set.isEmpty()) return true;
 
+        classifyElements(elementsSet);
 
-        MethodSpec main = MethodSpec.methodBuilder("main")
-                .addModifiers(Modifier.PUBLIC, Modifier.STATIC)
-                .returns(void.class)
-                .addParameter(String[].class, "args")
-                .addStatement("$T.out.println($S)", System.class, "Hello, JavaPoet!")
-                .build();
-
-        TypeSpec helloWorld = TypeSpec.classBuilder("HelloWorld")
-                .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
-                .addMethod(main)
-                .build();
-
-//        String packageName = elementUtils.getPackageOf(enclosingElement).getQualifiedName().toString();
-
-        try {
-            //代码的文件会生成在 app/build/generated/source/kapt
-            JavaFile.builder("pan.lib.butterknifelite", helloWorld)
-                    .addFileComment("编译时生成的xxxx_ViewBinding文件")
-                    .build().writeTo(environment.getFiler());
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-
+        generatingJavaClass();
 
         return true;
+    }
+
+
+    /*
+     * 区分注解该属于哪个类
+     * */
+    private void classifyElements(Set<? extends Element> elementsSet) {
+        for (Element element : elementsSet) {
+            String className = getFullClassName(element);
+            BindViewModel bindViewModel = map.get(className);
+            if (bindViewModel == null) {
+                bindViewModel = new BindViewModel(element, environment.getElementUtils());
+                map.put(className, bindViewModel);
+            } else {
+                bindViewModel.addBindView(element);
+            }
+        }
+    }
+
+    /**
+     * 获取注解属性的完整类名
+     */
+    private String getFullClassName(Element element) {
+        TypeElement typeElement = (TypeElement) element.getEnclosingElement();
+        String packageName = environment.getElementUtils().getPackageOf(typeElement).getQualifiedName().toString();
+        return packageName + "." + typeElement.getSimpleName().toString();
+    }
+
+
+    //使用java poet生成绑定视图代码
+    private void generatingJavaClass() {
+        map.forEach((classPath, bindViewModel) -> {
+
+            //JavaPoet获得class的重要的方法
+            ClassName activityClass = ClassName.get(bindViewModel.getPackageName(), bindViewModel.getTopClassName());
+
+
+            MethodSpec.Builder constructorBuilder = MethodSpec.constructorBuilder()
+                    .addModifiers(Modifier.PUBLIC)
+                    .addParameter(activityClass, "activity")
+                    .addStatement("this.activity=activity");
+
+            bindViewModel.getBindViewList().forEach(element -> {
+                BindView bindView = element.getAnnotation(BindView.class);//获得注解对象
+                constructorBuilder.addStatement("activity.$L=activity.findViewById($L)", element.getSimpleName(), bindView.value());
+            });
+
+
+            TypeSpec classType = TypeSpec.classBuilder(bindViewModel.getTopClassName() + "$ViewBinding")
+                    .addModifiers(Modifier.PUBLIC, Modifier.FINAL)
+                    .addMethod(constructorBuilder.build())
+                    .addField(activityClass, "activity", Modifier.PRIVATE)
+                    .build();
+
+            try {
+                JavaFile.builder(bindViewModel.getPackageName(), classType)
+                        .build().writeTo(environment.getFiler());
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        });
+
+
+    }
+
+    private void printLog(String log) {
+        messager.printMessage(Diagnostic.Kind.ERROR, log);
     }
 
     @Override
@@ -91,5 +135,6 @@ public class ButterKnifeProcessor extends AbstractProcessor {
         annotations.add(BindView.class.getCanonicalName());
         return annotations;
     }
+
 
 }
